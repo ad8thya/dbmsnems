@@ -5,7 +5,7 @@ const dbConfig = {
   user: 'system',
   password: '1070',
   // Note: For older Oracle XE like 11g, the service name is usually 'xe'
-  connectString: '192.168.1.3:1521/xe'
+  connectString: '127.0.0.1:1521/XEPDB1'
 };
 
 // Initialize connection pool

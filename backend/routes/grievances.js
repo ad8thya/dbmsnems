@@ -20,10 +20,10 @@ router.post('/grievance', async (req, res) => {
       return res.status(404).json({ error: 'Student not found' });
     }
 
-    // Auto-generate ticket_no: max existing + 1 for this student
+    // Auto-generate ticket_no: max existing + 1 in the entire table
     const maxTicket = await connection.execute(
-      'SELECT NVL(MAX(TICKET_NO), 0) + 1 AS NEXT_TICKET FROM GRIEVANCE WHERE STUDENT_ID = :id',
-      [student_id],
+      'SELECT NVL(MAX(TICKET_NO), 0) + 1 AS NEXT_TICKET FROM GRIEVANCE',
+      [],
       { outFormat: require('oracledb').OUT_FORMAT_OBJECT }
     );
     const ticketNo = maxTicket.rows[0].NEXT_TICKET;
