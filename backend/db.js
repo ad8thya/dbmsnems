@@ -3,8 +3,9 @@ const oracledb = require('oracledb');
 // Oracle connection configuration
 const dbConfig = {
   user: 'system',
-  password: 'adithya',
-  connectString: '127.0.0.1:1521/xepdb1'
+  password: '1070',
+  // Note: For older Oracle XE like 11g, the service name is usually 'xe'
+  connectString: '192.168.1.3:1521/xe'
 };
 
 // Initialize connection pool
