@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NEMS - Seat Allotment Results">
+  <title>NEMS — Seat Allotment</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <div id="nav-container"></div>
+
+    <main class="container">
+      <div class="page-header">
+        <h1>Seat Allotment</h1>
+        <p>View college and branch allotment results from counselling rounds</p>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <!-- Search -->
+      <div class="card" style="max-width: 600px; margin-bottom: 2rem;">
+        <h2 class="section-title">🔍 Search Allotment</h2>
+        <div class="search-bar">
+          <input type="number" id="student-id" placeholder="Enter Student ID (e.g. 1001)">
+          <button class="btn btn-primary" onclick="searchAllotment()">Search</button>
+        </div>
+      </div>
+
+      <!-- Student Info -->
+      <div id="student-info" style="display: none; margin-bottom: 2rem;">
+        <div class="card" style="max-width: 600px;">
+          <div style="display: flex; align-items: center; gap: 1rem;">
+            <div style="width: 56px; height: 56px; background: var(--gradient-primary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
+              🏛️
+            </div>
+            <div>
+              <h3 id="student-name" style="margin-bottom: 0.25rem;"></h3>
+              <p style="color: var(--text-secondary); font-size: 0.9rem;" id="student-detail"></p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Allotment Results -->
+      <div id="allotment-container">
+        <div class="empty-state">
+          <div class="empty-icon">🏛️</div>
+          <p>Enter a Student ID to view allotment results</p>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>NEMS — National Examination Management System &copy; 2026</p>
+    </footer>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    document.getElementById('nav-container').innerHTML = getNavHTML('allotment.html');
+
+    document.getElementById('student-id').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') searchAllotment();
+    });
+
+    async function searchAllotment() {
+      const studentId = document.getElementById('student-id').value.trim();
+      if (!studentId) {
+        showAlert('alert-container', 'Please enter a Student ID', 'error');
+        return;
+      }
+
+      const container = document.getElementById('allotment-container');
+      const infoDiv = document.getElementById('student-info');
+      container.innerHTML = '<div class="empty-state"><div class="spinner"></div><p>Loading allotment data...</p></div>';
+
+      try {
+        const allotments = await api.get(`/allotments/${studentId}`);
+
+        // Show student info
+        infoDiv.style.display = 'block';
+        document.getElementById('student-name').textContent =
+          `${allotments[0].FIRST_NAME} ${allotments[0].LAST_NAME}`;
+        document.getElementById('student-detail').textContent =
+          `Student ID: ${allotments[0].STUDENT_ID} — ${allotments.length} round(s)`;
+
+        container.innerHTML = `
+          <div class="table-wrapper animate-in">
+            <table>
+              <thead>
+                <tr>
+                  <th>Round</th>
+                  <th>College</th>
+                  <th>City</th>
+                  <th>Branch</th>
+                  <th>Category</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${allotments.map(a => `
+                  <tr>
+                    <td><strong>Round ${a.ROUND_NO}</strong></td>
+                    <td><strong>${a.COLLEGE_NAME}</strong></td>
+                    <td>${a.COLLEGE_CITY}</td>
+                    <td>${a.BRANCH_NAME} (${a.BRANCH_CODE})</td>
+                    <td><span class="badge badge-blue">${a.ALLOCATED_CATEGORY}</span></td>
+                    <td>${statusBadge(a.STATUS)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (err) {
+        infoDiv.style.display = 'none';
+        container.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">❌</div>
+            <p>${err.message}</p>
+          </div>`;
+      }
+    }
+  </script>
+</body>
+</html>

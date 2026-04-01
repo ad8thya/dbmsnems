@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NEMS - Student Registration and Management">
+  <title>NEMS — Student Management</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <div id="nav-container"></div>
+
+    <main class="container">
+      <div class="page-header">
+        <h1>Student Management</h1>
+        <p>Register new students and manage existing records</p>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <div class="content-grid">
+        <!-- Registration Form -->
+        <div>
+          <h2 class="section-title">📋 Register New Student</h2>
+          <div class="card form-section">
+            <form id="student-form">
+              <div class="form-row">
+                <div class="form-group">
+                  <label>First Name <span class="required">*</span></label>
+                  <input type="text" id="first_name" placeholder="Enter first name" required>
+                </div>
+                <div class="form-group">
+                  <label>Last Name <span class="required">*</span></label>
+                  <input type="text" id="last_name" placeholder="Enter last name" required>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Email <span class="required">*</span></label>
+                <input type="email" id="email" placeholder="student@email.com" required>
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Date of Birth <span class="required">*</span></label>
+                  <input type="date" id="dob" required>
+                </div>
+                <div class="form-group">
+                  <label>Category <span class="required">*</span></label>
+                  <select id="category" required>
+                    <option value="">Select category</option>
+                    <option value="General">General</option>
+                    <option value="OBC">OBC</option>
+                    <option value="SC">SC</option>
+                    <option value="ST">ST</option>
+                    <option value="EWS">EWS</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Street</label>
+                <input type="text" id="street" placeholder="Street address">
+              </div>
+
+              <div class="form-row">
+                <div class="form-group">
+                  <label>City</label>
+                  <input type="text" id="city" placeholder="City">
+                </div>
+                <div class="form-group">
+                  <label>State</label>
+                  <input type="text" id="state" placeholder="State">
+                </div>
+              </div>
+
+              <div class="form-group">
+                <label>Exam Center <span class="required">*</span></label>
+                <select id="center_id" required>
+                  <option value="">Loading centers...</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Phone Numbers</label>
+                <div class="phone-group" id="phone-group">
+                  <div class="phone-entry">
+                    <input type="tel" class="phone-input" placeholder="10-digit phone number" maxlength="10">
+                    <button type="button" class="btn btn-secondary btn-sm" onclick="addPhoneField()">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <button type="submit" class="btn btn-primary" id="submit-btn">
+                Register Student
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Students List -->
+        <div>
+          <h2 class="section-title">👥 Registered Students</h2>
+          <div id="students-table-container">
+            <div class="empty-state">
+              <div class="empty-icon">👤</div>
+              <p>Loading students...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>NEMS — National Examination Management System &copy; 2026</p>
+    </footer>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    document.getElementById('nav-container').innerHTML = getNavHTML('students.html');
+
+    // Load centers for dropdown
+    async function loadCenters() {
+      try {
+        const centers = await api.get('/students/centers/list');
+        populateSelect('center_id', centers, 'CENTER_ID', 
+          item => `${item.CENTER_NAME} (${item.CENTER_CITY})`,
+          'Select exam center'
+        );
+      } catch (err) {
+        console.error('Failed to load centers:', err);
+      }
+    }
+
+    // Load students list
+    async function loadStudents() {
+      try {
+        const students = await api.get('/students');
+        const container = document.getElementById('students-table-container');
+
+        if (students.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <div class="empty-icon">👤</div>
+              <p>No students registered yet</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>Name</th>
+                  <th>Email</th>
+                  <th>Category</th>
+                  <th>Center</th>
+                  <th>Phones</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${students.map(s => `
+                  <tr>
+                    <td><strong>${s.STUDENT_ID}</strong></td>
+                    <td>${s.FIRST_NAME} ${s.LAST_NAME}</td>
+                    <td>${s.EMAIL}</td>
+                    <td><span class="badge badge-blue">${s.CATEGORY}</span></td>
+                    <td>${s.CENTER_NAME || '—'}</td>
+                    <td>${s.PHONE_NUMBERS.join(', ') || '—'}</td>
+                    <td>
+                      <button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.STUDENT_ID})">Delete</button>
+                    </td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (err) {
+        console.error('Failed to load students:', err);
+      }
+    }
+
+    // Add phone field
+    function addPhoneField() {
+      const group = document.getElementById('phone-group');
+      const entry = document.createElement('div');
+      entry.className = 'phone-entry';
+      entry.innerHTML = `
+        <input type="tel" class="phone-input" placeholder="10-digit phone number" maxlength="10">
+        <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">✕</button>
+      `;
+      group.appendChild(entry);
+    }
+
+    // Submit form
+    document.getElementById('student-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Registering...';
+
+      try {
+        const phoneInputs = document.querySelectorAll('.phone-input');
+        const phone_numbers = Array.from(phoneInputs)
+          .map(input => input.value.trim())
+          .filter(p => p);
+
+        const data = {
+          first_name: document.getElementById('first_name').value.trim(),
+          last_name: document.getElementById('last_name').value.trim(),
+          email: document.getElementById('email').value.trim(),
+          dob: document.getElementById('dob').value,
+          street: document.getElementById('street').value.trim(),
+          city: document.getElementById('city').value.trim(),
+          state: document.getElementById('state').value.trim(),
+          category: document.getElementById('category').value,
+          center_id: parseInt(document.getElementById('center_id').value),
+          phone_numbers
+        };
+
+        const result = await api.post('/students', data);
+        showAlert('alert-container', `${result.message} (ID: ${result.student_id})`, 'success');
+        document.getElementById('student-form').reset();
+        loadStudents();
+      } catch (err) {
+        showAlert('alert-container', err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Register Student';
+      }
+    });
+
+    // Delete student
+    async function deleteStudent(id) {
+      if (!confirm(`Are you sure you want to delete student ${id}?`)) return;
+      try {
+        await api.delete(`/students/${id}`);
+        showAlert('alert-container', 'Student deleted successfully', 'success');
+        loadStudents();
+      } catch (err) {
+        showAlert('alert-container', err.message, 'error');
+      }
+    }
+
+    // Initialize
+    loadCenters();
+    loadStudents();
+  </script>
+</body>
+</html>

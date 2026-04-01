@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NEMS - Grievance Submission Portal">
+  <title>NEMS — Grievance Portal</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <div id="nav-container"></div>
+
+    <main class="container">
+      <div class="page-header">
+        <h1>Grievance Portal</h1>
+        <p>Submit and track your grievances</p>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <div class="content-grid">
+        <!-- Submission Form -->
+        <div>
+          <h2 class="section-title">📨 Submit Grievance</h2>
+          <div class="card form-section">
+            <form id="grievance-form">
+              <div class="form-group">
+                <label>Student ID <span class="required">*</span></label>
+                <input type="number" id="student_id" placeholder="Enter your Student ID" required>
+              </div>
+
+              <div class="form-group">
+                <label>Issue Type <span class="required">*</span></label>
+                <select id="issue_type" required>
+                  <option value="">Select issue type</option>
+                  <option value="Score Discrepancy">Score Discrepancy</option>
+                  <option value="Technical Issue">Technical Issue</option>
+                  <option value="Center Issue">Center Issue</option>
+                  <option value="Registration Issue">Registration Issue</option>
+                  <option value="Result Error">Result Error</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Description <span class="required">*</span></label>
+                <textarea id="description" placeholder="Describe your issue in detail..." rows="4" required></textarea>
+              </div>
+
+              <button type="submit" class="btn btn-primary" id="submit-btn">
+                Submit Grievance
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- Lookup Grievances -->
+        <div>
+          <h2 class="section-title">🔍 Track Grievances</h2>
+          <div class="card">
+            <div class="search-bar">
+              <input type="number" id="lookup-id" placeholder="Student ID">
+              <button class="btn btn-secondary" onclick="lookupGrievances()">Search</button>
+            </div>
+            <div id="grievance-result"></div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>NEMS — National Examination Management System &copy; 2026</p>
+    </footer>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    document.getElementById('nav-container').innerHTML = getNavHTML('grievance.html');
+
+    // Submit grievance
+    document.getElementById('grievance-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Submitting...';
+
+      try {
+        const data = {
+          student_id: parseInt(document.getElementById('student_id').value),
+          issue_type: document.getElementById('issue_type').value,
+          description: document.getElementById('description').value.trim()
+        };
+
+        const result = await api.post('/grievance', data);
+        showAlert('alert-container', 
+          `${result.message} — Ticket #${result.ticket_no}`, 'success');
+        document.getElementById('grievance-form').reset();
+      } catch (err) {
+        showAlert('alert-container', err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Submit Grievance';
+      }
+    });
+
+    // Lookup grievances
+    async function lookupGrievances() {
+      const studentId = document.getElementById('lookup-id').value;
+      if (!studentId) {
+        showAlert('alert-container', 'Please enter a Student ID', 'error');
+        return;
+      }
+
+      const container = document.getElementById('grievance-result');
+
+      try {
+        const grievances = await api.get(`/grievances/${studentId}`);
+
+        if (grievances.length === 0) {
+          container.innerHTML = `
+            <div class="empty-state">
+              <p>No grievances found for student ${studentId}</p>
+            </div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div style="margin-top: 1rem;">
+            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
+              <strong>${grievances[0].FIRST_NAME} ${grievances[0].LAST_NAME}</strong> — ${grievances.length} grievance(s)
+            </p>
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Ticket #</th>
+                    <th>Issue Type</th>
+                    <th>Description</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${grievances.map(g => `
+                    <tr>
+                      <td><strong>${g.TICKET_NO}</strong></td>
+                      <td>${g.ISSUE_TYPE}</td>
+                      <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${g.DESCRIPTION}">${g.DESCRIPTION}</td>
+                      <td>${statusBadge(g.STATUS)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>`;
+      } catch (err) {
+        showAlert('alert-container', err.message, 'error');
+      }
+    }
+
+    // Allow Enter key in lookup
+    document.getElementById('lookup-id').addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') lookupGrievances();
+    });
+  </script>
+</body>
+</html>

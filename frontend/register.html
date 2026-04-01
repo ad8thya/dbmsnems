@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="NEMS - Exam Session Registration">
+  <title>NEMS — Exam Registration</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="page-wrapper">
+    <div id="nav-container"></div>
+
+    <main class="container">
+      <div class="page-header">
+        <h1>Exam Registration</h1>
+        <p>Register students for exam sessions</p>
+      </div>
+
+      <div id="alert-container"></div>
+
+      <div class="content-grid">
+        <!-- Registration Form -->
+        <div>
+          <h2 class="section-title">📝 Register for Exam</h2>
+          <div class="card form-section">
+            <form id="register-form">
+              <div class="form-group">
+                <label>Student <span class="required">*</span></label>
+                <select id="student_id" required>
+                  <option value="">Loading students...</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Exam <span class="required">*</span></label>
+                <select id="exam_code" required>
+                  <option value="">Loading exams...</option>
+                </select>
+              </div>
+
+              <div class="form-group">
+                <label>Session <span class="required">*</span></label>
+                <select id="session_id" required disabled>
+                  <option value="">Select an exam first</option>
+                </select>
+              </div>
+
+              <button type="submit" class="btn btn-primary" id="submit-btn">
+                Register for Session
+              </button>
+            </form>
+          </div>
+
+          <!-- Lookup Registrations -->
+          <div style="margin-top: 2rem;">
+            <h2 class="section-title">🔍 Lookup Registrations</h2>
+            <div class="card">
+              <div class="search-bar">
+                <input type="number" id="lookup-id" placeholder="Enter Student ID" style="max-width: 200px;">
+                <button class="btn btn-secondary" onclick="lookupRegistrations()">Search</button>
+              </div>
+              <div id="lookup-result"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Available Sessions Info -->
+        <div>
+          <h2 class="section-title">📅 Available Exam Sessions</h2>
+          <div id="sessions-container">
+            <div class="empty-state">
+              <div class="empty-icon">📅</div>
+              <p>Select an exam to see sessions</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <footer class="footer">
+      <p>NEMS — National Examination Management System &copy; 2026</p>
+    </footer>
+  </div>
+
+  <script src="js/api.js"></script>
+  <script>
+    document.getElementById('nav-container').innerHTML = getNavHTML('register.html');
+
+    // Load students dropdown
+    async function loadStudents() {
+      try {
+        const students = await api.get('/students');
+        populateSelect('student_id', students, 'STUDENT_ID',
+          item => `${item.STUDENT_ID} — ${item.FIRST_NAME} ${item.LAST_NAME}`,
+          'Select student'
+        );
+      } catch (err) {
+        console.error('Failed to load students:', err);
+      }
+    }
+
+    // Load exams dropdown
+    async function loadExams() {
+      try {
+        const exams = await api.get('/exams');
+        populateSelect('exam_code', exams, 'EXAM_CODE',
+          item => `${item.EXAM_NAME} (${item.EXAM_CODE}) — ${item.TOTAL_MARKS} marks`,
+          'Select exam'
+        );
+      } catch (err) {
+        console.error('Failed to load exams:', err);
+      }
+    }
+
+    // When exam is selected, load sessions
+    document.getElementById('exam_code').addEventListener('change', async (e) => {
+      const examCode = e.target.value;
+      const sessionSelect = document.getElementById('session_id');
+
+      if (!examCode) {
+        sessionSelect.innerHTML = '<option value="">Select an exam first</option>';
+        sessionSelect.disabled = true;
+        document.getElementById('sessions-container').innerHTML = `
+          <div class="empty-state">
+            <div class="empty-icon">📅</div>
+            <p>Select an exam to see sessions</p>
+          </div>`;
+        return;
+      }
+
+      try {
+        const sessions = await api.get(`/exams/${examCode}/sessions`);
+        sessionSelect.disabled = false;
+
+        populateSelect('session_id', sessions, 'SESSION_ID',
+          item => `${item.PHASE} — ${item.SHIFT} — ${formatDate(item.EXAM_DATE)}`,
+          'Select session'
+        );
+
+        // Show sessions table
+        if (sessions.length > 0) {
+          document.getElementById('sessions-container').innerHTML = `
+            <div class="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Session ID</th>
+                    <th>Phase</th>
+                    <th>Shift</th>
+                    <th>Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${sessions.map(s => `
+                    <tr>
+                      <td><strong>${s.SESSION_ID}</strong></td>
+                      <td>${s.PHASE}</td>
+                      <td>${s.SHIFT}</td>
+                      <td>${formatDate(s.EXAM_DATE)}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            </div>`;
+        }
+      } catch (err) {
+        console.error('Failed to load sessions:', err);
+      }
+    });
+
+    // Submit registration
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = true;
+      btn.textContent = 'Registering...';
+
+      try {
+        const data = {
+          student_id: parseInt(document.getElementById('student_id').value),
+          session_id: parseInt(document.getElementById('session_id').value)
+        };
+
+        const result = await api.post('/register', data);
+        showAlert('alert-container', result.message, 'success');
+        document.getElementById('register-form').reset();
+        document.getElementById('session_id').disabled = true;
+        document.getElementById('session_id').innerHTML = '<option value="">Select an exam first</option>';
+      } catch (err) {
+        showAlert('alert-container', err.message, 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Register for Session';
+      }
+    });
+
+    // Lookup registrations
+    async function lookupRegistrations() {
+      const studentId = document.getElementById('lookup-id').value;
+      if (!studentId) {
+        showAlert('alert-container', 'Please enter a Student ID', 'error');
+        return;
+      }
+
+      try {
+        const registrations = await api.get(`/registrations/${studentId}`);
+        const container = document.getElementById('lookup-result');
+
+        if (registrations.length === 0) {
+          container.innerHTML = `<div class="empty-state"><p>No registrations found for student ${studentId}</p></div>`;
+          return;
+        }
+
+        container.innerHTML = `
+          <div class="table-wrapper" style="margin-top: 1rem;">
+            <table>
+              <thead>
+                <tr>
+                  <th>Exam</th>
+                  <th>Session</th>
+                  <th>Phase</th>
+                  <th>Shift</th>
+                  <th>Exam Date</th>
+                  <th>Registered On</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${registrations.map(r => `
+                  <tr>
+                    <td><strong>${r.EXAM_NAME}</strong></td>
+                    <td>${r.SESSION_ID}</td>
+                    <td>${r.PHASE}</td>
+                    <td>${r.SHIFT}</td>
+                    <td>${formatDate(r.EXAM_DATE)}</td>
+                    <td>${formatDate(r.REGISTRATION_DATE)}</td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (err) {
+        showAlert('alert-container', err.message, 'error');
+      }
+    }
+
+    // Initialize
+    loadStudents();
+    loadExams();
+  </script>
+</body>
+</html>
