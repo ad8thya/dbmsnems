@@ -4,6 +4,13 @@ const db = require('../db');
 
 // GET /api/results/:student_id — Get all results for a student
 router.get('/results/:student_id', async (req, res) => {
+  const userRole = req.headers['x-user-role'];
+  const loggedInStudentId = req.headers['x-student-id'];
+
+  if (userRole === 'student' && req.params.student_id.toString() !== loggedInStudentId.toString()) {
+    return res.status(403).json({ error: 'You can only view your own results' });
+  }
+
   try {
     const result = await db.execute(
       `SELECT r.STUDENT_ID, r.SESSION_ID, r.SCORE, r.PERCENTILE,
@@ -19,11 +26,43 @@ router.get('/results/:student_id', async (req, res) => {
       [req.params.student_id]
     );
 
-    if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'No results found for this student' });
+    res.json(result.rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// POST /api/results — Update or Insert result (Admin only)
+router.post('/results', async (req, res) => {
+  const userRole = req.headers['x-user-role'];
+  if (userRole !== 'admin') {
+    return res.status(403).json({ error: 'Only admins can update results' });
+  }
+
+  const { student_id, session_id, score, percentile } = req.body;
+
+  try {
+    // Check if result exists
+    const check = await db.execute(
+      'SELECT * FROM RESULT WHERE STUDENT_ID = :sid AND SESSION_ID = :ssid',
+      [student_id, session_id]
+    );
+
+    if (check.rows.length > 0) {
+      // Update
+      await db.execute(
+        'UPDATE RESULT SET SCORE = :score, PERCENTILE = :percentile WHERE STUDENT_ID = :sid AND SESSION_ID = :ssid',
+        { score, percentile, sid: student_id, ssid: session_id }
+      );
+    } else {
+      // Insert
+      await db.execute(
+        'INSERT INTO RESULT (STUDENT_ID, SESSION_ID, SCORE, PERCENTILE) VALUES (:sid, :ssid, :score, :percentile)',
+        { sid: student_id, ssid: session_id, score, percentile }
+      );
     }
 
-    res.json(result.rows);
+    res.json({ message: 'Result updated successfully' });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

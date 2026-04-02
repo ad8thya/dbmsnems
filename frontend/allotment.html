@@ -13,41 +13,60 @@
 
     <main class="container">
       <div class="page-header">
-        <h1>Seat Allotment</h1>
-        <p>View college and branch allotment results from counselling rounds</p>
+        <h1 id="page-title">Seat Allotment</h1>
+        <p id="page-desc">Check your college and branch allotment status</p>
       </div>
 
       <div id="alert-container"></div>
 
-      <!-- Search -->
-      <div class="card" style="max-width: 600px; margin-bottom: 2rem;">
-        <h2 class="section-title">🔍 Search Allotment</h2>
-        <div class="search-bar">
-          <input type="number" id="student-id" placeholder="Enter Student ID (e.g. 1001)">
-          <button class="btn btn-primary" onclick="searchAllotment()">Search</button>
+      <!-- Admin Update Section -->
+      <div id="admin-update" style="display: none; margin-bottom: 2rem;">
+        <h2 class="section-title">🏛️ Assign / Update Allotment</h2>
+        <div class="card">
+          <form id="allotment-update-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: var(--space-md); align-items: end;">
+            <div class="form-group">
+              <label>Student ID</label>
+              <input type="number" id="up-student-id" required>
+            </div>
+            <div class="form-group">
+              <label>Round #</label>
+              <input type="number" id="up-round" required>
+            </div>
+            <div class="form-group">
+              <label>Branch Code</label>
+              <input type="text" id="up-branch" required>
+            </div>
+            <div class="form-group">
+              <label>College Code</label>
+              <input type="text" id="up-college" required>
+            </div>
+            <div class="form-group">
+              <label>Category</label>
+              <input type="text" id="up-category" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Save Allotment</button>
+          </form>
         </div>
       </div>
 
-      <!-- Student Info -->
-      <div id="student-info" style="display: none; margin-bottom: 2rem;">
-        <div class="card" style="max-width: 600px;">
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <div style="width: 56px; height: 56px; background: var(--gradient-primary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-              🏛️
-            </div>
-            <div>
-              <h3 id="student-name" style="margin-bottom: 0.25rem;"></h3>
-              <p style="color: var(--text-secondary); font-size: 0.9rem;" id="student-detail"></p>
-            </div>
+      <!-- Search Section (Admin) -->
+      <div id="admin-search" style="display: none; margin-bottom: 2rem;">
+        <h2 class="section-title">🔍 Search Allotments</h2>
+        <div class="card" style="max-width: 500px;">
+          <div class="search-bar">
+            <input type="number" id="search-id" placeholder="Student ID">
+            <button class="btn btn-secondary" onclick="searchAllotment()">Search</button>
           </div>
         </div>
       </div>
 
-      <!-- Allotment Results -->
-      <div id="allotment-container">
-        <div class="empty-state">
-          <div class="empty-icon">🏛️</div>
-          <p>Enter a Student ID to view allotment results</p>
+      <!-- Results Display -->
+      <div id="allotment-display">
+        <div id="student-info" style="display: none; margin-bottom: 1.5rem;">
+          <h3 id="display-name"></h3>
+        </div>
+        <div id="allotment-results-container">
+          <div class="empty-state"><p>No allotment records found.</p></div>
         </div>
       </div>
     </main>
@@ -61,52 +80,45 @@
   <script>
     document.getElementById('nav-container').innerHTML = getNavHTML('allotment.html');
 
-    document.getElementById('student-id').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') searchAllotment();
-    });
+    const role = auth.getRole();
+    const studentId = auth.getStudentId();
 
-    async function searchAllotment() {
-      const studentId = document.getElementById('student-id').value.trim();
-      if (!studentId) {
-        showAlert('alert-container', 'Please enter a Student ID', 'error');
-        return;
-      }
+    if (role === 'admin') {
+      document.getElementById('page-title').textContent = 'Allotment Control';
+      document.getElementById('page-desc').textContent = 'Manage student seat allotments and counselling rounds';
+      document.getElementById('admin-update').style.display = 'block';
+      document.getElementById('admin-search').style.display = 'block';
+    } else {
+      searchAllotment(studentId);
+    }
 
-      const container = document.getElementById('allotment-container');
-      const infoDiv = document.getElementById('student-info');
-      container.innerHTML = '<div class="empty-state"><div class="spinner"></div><p>Loading allotment data...</p></div>';
+    async function searchAllotment(id) {
+      const sid = id || document.getElementById('search-id').value;
+      if (!sid) return;
 
+      const container = document.getElementById('allotment-results-container');
       try {
-        const allotments = await api.get(`/allotments/${studentId}`);
+        const allotments = await api.get(`/allotments/${sid}`);
+        if (allotments.length === 0) {
+          container.innerHTML = '<div class="empty-state"><p>No allotment found for this student.</p></div>';
+          return;
+        }
 
-        // Show student info
-        infoDiv.style.display = 'block';
-        document.getElementById('student-name').textContent =
-          `${allotments[0].FIRST_NAME} ${allotments[0].LAST_NAME}`;
-        document.getElementById('student-detail').textContent =
-          `Student ID: ${allotments[0].STUDENT_ID} — ${allotments.length} round(s)`;
+        document.getElementById('student-info').style.display = 'block';
+        document.getElementById('display-name').textContent = `Allotment for ${allotments[0].FIRST_NAME} ${allotments[0].LAST_NAME}`;
 
         container.innerHTML = `
           <div class="table-wrapper animate-in">
             <table>
               <thead>
-                <tr>
-                  <th>Round</th>
-                  <th>College</th>
-                  <th>City</th>
-                  <th>Branch</th>
-                  <th>Category</th>
-                  <th>Status</th>
-                </tr>
+                <tr><th>Round</th><th>College</th><th>Branch</th><th>Status</th></tr>
               </thead>
               <tbody>
                 ${allotments.map(a => `
                   <tr>
                     <td><strong>Round ${a.ROUND_NO}</strong></td>
-                    <td><strong>${a.COLLEGE_NAME}</strong></td>
-                    <td>${a.COLLEGE_CITY}</td>
-                    <td>${a.BRANCH_NAME} (${a.BRANCH_CODE})</td>
-                    <td><span class="badge badge-blue">${a.ALLOCATED_CATEGORY}</span></td>
+                    <td><strong>${a.COLLEGE_NAME}</strong> (${a.COLLEGE_CITY})</td>
+                    <td>${a.BRANCH_NAME}</td>
                     <td>${statusBadge(a.STATUS)}</td>
                   </tr>
                 `).join('')}
@@ -114,14 +126,29 @@
             </table>
           </div>`;
       } catch (err) {
-        infoDiv.style.display = 'none';
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">❌</div>
-            <p>${err.message}</p>
-          </div>`;
+        container.innerHTML = `<div class="empty-state"><p>${err.message}</p></div>`;
       }
     }
+
+    document.getElementById('allotment-update-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        student_id: parseInt(document.getElementById('up-student-id').value),
+        round_no: parseInt(document.getElementById('up-round').value),
+        branch_code: document.getElementById('up-branch').value,
+        college_id: parseInt(document.getElementById('up-college').value),
+        allocated_category: document.getElementById('up-category').value,
+        status: 'Confirmed'
+      };
+
+      try {
+        await api.post('/allotments', payload);
+        showAlert('alert-container', 'Allotment updated successfully', 'success');
+        searchAllotment(payload.student_id);
+      } catch (err) {
+        showAlert('alert-container', err.message, 'error');
+      }
+    });
   </script>
 </body>
 </html>

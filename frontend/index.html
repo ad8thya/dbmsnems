@@ -13,67 +13,50 @@
 
     <main class="container">
       <div class="page-header">
-        <h1>Dashboard</h1>
+        <h1 id="welcome-text">Dashboard</h1>
         <p>National Examination Management System — Overview</p>
       </div>
 
-      <!-- Stats Cards -->
-      <div class="dashboard-grid" id="stats-grid">
-        <div class="stat-card animate-in">
-          <div class="stat-icon icon-blue">👤</div>
-          <div class="stat-value" id="stat-students">—</div>
-          <div class="stat-label">Students</div>
+      <!-- Stats Cards (Visible only to Admin) -->
+      <div id="admin-stats" style="display: none;">
+        <div class="dashboard-grid">
+          <div class="stat-card animate-in">
+            <div class="stat-icon icon-blue">👤</div>
+            <div class="stat-value" id="stat-students">—</div>
+            <div class="stat-label">Students</div>
+          </div>
+          <div class="stat-card animate-in">
+            <div class="stat-icon icon-purple">📝</div>
+            <div class="stat-value" id="stat-exams">—</div>
+            <div class="stat-label">Exams</div>
+          </div>
+          <div class="stat-card animate-in">
+            <div class="stat-icon icon-cyan">📋</div>
+            <div class="stat-value" id="stat-registrations">—</div>
+            <div class="stat-label">Registrations</div>
+          </div>
+          <div class="stat-card animate-in">
+            <div class="stat-icon icon-pink">📨</div>
+            <div class="stat-value" id="stat-grievances">—</div>
+            <div class="stat-label">Grievances</div>
+          </div>
         </div>
-        <div class="stat-card animate-in">
-          <div class="stat-icon icon-purple">📝</div>
-          <div class="stat-value" id="stat-exams">—</div>
-          <div class="stat-label">Exams</div>
-        </div>
-        <div class="stat-card animate-in">
-          <div class="stat-icon icon-cyan">📋</div>
-          <div class="stat-value" id="stat-registrations">—</div>
-          <div class="stat-label">Registrations</div>
-        </div>
-        <div class="stat-card animate-in">
-          <div class="stat-icon icon-amber">📊</div>
-          <div class="stat-value" id="stat-results">—</div>
-          <div class="stat-label">Results</div>
-        </div>
-        <div class="stat-card animate-in">
-          <div class="stat-icon icon-pink">📨</div>
-          <div class="stat-value" id="stat-grievances">—</div>
-          <div class="stat-label">Grievances</div>
+      </div>
+
+      <!-- Student Welcome (Visible only to Student) -->
+      <div id="student-welcome" style="display: none; margin-bottom: var(--space-2xl);">
+        <div class="card animate-in" style="background: var(--gradient-card);">
+          <h3>Welcome to the NEMS Portal</h3>
+          <p style="margin-top: var(--space-sm); color: var(--text-secondary);">
+            Use the quick links below to manage your examinations, view results, and check your seat allotment status.
+          </p>
         </div>
       </div>
 
       <!-- Feature Navigation -->
       <h2 class="section-title" style="margin-bottom: 1.5rem;">Quick Access</h2>
-      <div class="feature-grid">
-        <a href="students.html" class="feature-card animate-in">
-          <div class="feature-icon icon-blue">👤</div>
-          <h3>Student Management</h3>
-          <p>Register new students, view and manage existing student records and phone numbers.</p>
-        </a>
-        <a href="register.html" class="feature-card animate-in">
-          <div class="feature-icon icon-purple">📝</div>
-          <h3>Exam Registration</h3>
-          <p>Register students for exam sessions. View current registrations.</p>
-        </a>
-        <a href="results.html" class="feature-card animate-in">
-          <div class="feature-icon icon-cyan">📊</div>
-          <h3>View Results</h3>
-          <p>Look up exam results by student ID. View scores and percentiles.</p>
-        </a>
-        <a href="grievance.html" class="feature-card animate-in">
-          <div class="feature-icon icon-amber">📨</div>
-          <h3>Grievance Portal</h3>
-          <p>Submit and track grievances. Check ticket status and resolution.</p>
-        </a>
-        <a href="allotment.html" class="feature-card animate-in">
-          <div class="feature-icon icon-green">🏛️</div>
-          <h3>Seat Allotment</h3>
-          <p>View college and branch allotment results for counselling rounds.</p>
-        </a>
+      <div class="feature-grid" id="feature-grid">
+        <!-- Will be populated dynamically -->
       </div>
     </main>
 
@@ -87,21 +70,56 @@
     // Render navigation
     document.getElementById('nav-container').innerHTML = getNavHTML('index.html');
 
-    // Load dashboard stats
+    const role = auth.getRole();
+    const welcomeText = document.getElementById('welcome-text');
+    const adminStats = document.getElementById('admin-stats');
+    const studentWelcome = document.getElementById('student-welcome');
+    const featureGrid = document.getElementById('feature-grid');
+
+    if (role === 'admin') {
+      welcomeText.textContent = 'Admin Dashboard';
+      adminStats.style.display = 'block';
+      loadStats();
+      populateFeatures([
+        { href: 'students.html', icon: '👤', color: 'blue', title: 'Student Management', desc: 'View and manage student records.' },
+        { href: 'register.html', icon: '📝', color: 'purple', title: 'Registrations', desc: 'Track and manage exam registrations.' },
+        { href: 'results.html', icon: '📊', color: 'cyan', title: 'Update Results', desc: 'Input and update examination marks.' },
+        { href: 'grievance.html', icon: '📨', color: 'amber', title: 'Handle Grievances', desc: 'Track and resolve student issues.' },
+        { href: 'allotment.html', icon: '🏛️', color: 'green', title: 'Allotment Control', desc: 'Manage seat allotment results.' }
+      ]);
+    } else {
+      welcomeText.textContent = `Welcome, ${auth.getUserName()}!`;
+      studentWelcome.style.display = 'block';
+      populateFeatures([
+        { href: 'students.html', icon: '👤', color: 'blue', title: 'My Profile', desc: 'View and update your personal details.' },
+        { href: 'register.html', icon: '📝', color: 'purple', title: 'Register for Exam', desc: 'Sign up for upcoming exam sessions.' },
+        { href: 'results.html', icon: '📊', color: 'cyan', title: 'My Results', desc: 'Check your scores and percentiles.' },
+        { href: 'grievance.html', icon: '📨', color: 'amber', title: 'Help Desk', desc: 'Submit and track your grievances.' },
+        { href: 'allotment.html', icon: '🏛️', color: 'green', title: 'My Allotment', desc: 'Check your counselling allotment.' }
+      ]);
+    }
+
+    function populateFeatures(features) {
+      featureGrid.innerHTML = features.map(f => `
+        <a href="${f.href}" class="feature-card animate-in">
+          <div class="feature-icon icon-${f.color}">${f.icon}</div>
+          <h3>${f.title}</h3>
+          <p>${f.desc}</p>
+        </a>
+      `).join('');
+    }
+
     async function loadStats() {
       try {
         const stats = await api.get('/stats');
         document.getElementById('stat-students').textContent = stats.students;
         document.getElementById('stat-exams').textContent = stats.exams;
         document.getElementById('stat-registrations').textContent = stats.registrations;
-        document.getElementById('stat-results').textContent = stats.results;
         document.getElementById('stat-grievances').textContent = stats.grievances;
       } catch (err) {
         console.error('Failed to load stats:', err.message);
       }
     }
-
-    loadStats();
   </script>
 </body>
 </html>

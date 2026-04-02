@@ -13,41 +13,56 @@
 
     <main class="container">
       <div class="page-header">
-        <h1>Examination Results</h1>
-        <p>Look up results by Student ID</p>
+        <h1 id="page-title">Examination Results</h1>
+        <p id="page-desc">View your academic performance</p>
       </div>
 
       <div id="alert-container"></div>
 
-      <!-- Search Section -->
-      <div class="card" style="max-width: 600px; margin-bottom: 2rem;">
-        <h2 class="section-title">🔍 Search Results</h2>
-        <div class="search-bar">
-          <input type="number" id="student-id" placeholder="Enter Student ID (e.g. 1001)">
-          <button class="btn btn-primary" onclick="searchResults()">Search</button>
+      <!-- Admin Update Section -->
+      <div id="admin-update" style="display: none; margin-bottom: 2rem;">
+        <h2 class="section-title">✍️ Update Student Result</h2>
+        <div class="card">
+          <form id="result-update-form" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-md); align-items: end;">
+            <div class="form-group">
+              <label>Student ID</label>
+              <input type="number" id="update-student-id" required>
+            </div>
+            <div class="form-group">
+              <label>Session ID</label>
+              <input type="number" id="update-session-id" required>
+            </div>
+            <div class="form-group">
+              <label>Score</label>
+              <input type="number" id="update-score" required>
+            </div>
+            <div class="form-group">
+              <label>Percentile</label>
+              <input type="number" step="0.01" id="update-percentile" required>
+            </div>
+            <button type="submit" class="btn btn-primary">Update Result</button>
+          </form>
         </div>
       </div>
 
-      <!-- Student Info -->
-      <div id="student-info" style="display: none; margin-bottom: 2rem;">
-        <div class="card" style="max-width: 600px;">
-          <div style="display: flex; align-items: center; gap: 1rem;">
-            <div style="width: 56px; height: 56px; background: var(--gradient-primary); border-radius: var(--radius-md); display: flex; align-items: center; justify-content: center; font-size: 1.5rem;">
-              👤
-            </div>
-            <div>
-              <h3 id="student-name" style="margin-bottom: 0.25rem;"></h3>
-              <p style="color: var(--text-secondary); font-size: 0.9rem;" id="student-detail"></p>
-            </div>
+      <!-- Admin Search Section -->
+      <div id="admin-search" style="display: none; margin-bottom: 2rem;">
+        <h2 class="section-title">🔍 Search Student Results</h2>
+        <div class="card" style="max-width: 500px;">
+          <div class="search-bar">
+            <input type="number" id="search-id" placeholder="Enter Student ID">
+            <button class="btn btn-secondary" onclick="searchResults()">Search</button>
           </div>
         </div>
       </div>
 
-      <!-- Results Table -->
-      <div id="results-container">
-        <div class="empty-state">
-          <div class="empty-icon">📊</div>
-          <p>Enter a Student ID to view results</p>
+      <!-- Results Display -->
+      <div id="results-display">
+        <div id="student-info" style="display: none; margin-bottom: 1.5rem;">
+          <h3 id="display-name"></h3>
+        </div>
+        <div id="results-table-container">
+          <div class="empty-state"><p>No results to display</p></div>
         </div>
       </div>
     </main>
@@ -61,33 +76,33 @@
   <script>
     document.getElementById('nav-container').innerHTML = getNavHTML('results.html');
 
-    // Allow Enter key to trigger search
-    document.getElementById('student-id').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') searchResults();
-    });
+    const role = auth.getRole();
+    const studentId = auth.getStudentId();
 
-    async function searchResults() {
-      const studentId = document.getElementById('student-id').value.trim();
-      if (!studentId) {
-        showAlert('alert-container', 'Please enter a Student ID', 'error');
-        return;
-      }
+    if (role === 'admin') {
+      document.getElementById('page-title').textContent = 'Results Management';
+      document.getElementById('page-desc').textContent = 'Input and manage student examination results';
+      document.getElementById('admin-update').style.display = 'block';
+      document.getElementById('admin-search').style.display = 'block';
+    } else {
+      searchResults(studentId);
+    }
 
-      const container = document.getElementById('results-container');
-      const infoDiv = document.getElementById('student-info');
-      container.innerHTML = '<div class="empty-state"><div class="spinner"></div><p>Loading results...</p></div>';
+    async function searchResults(id) {
+      const sid = id || document.getElementById('search-id').value;
+      if (!sid) return;
 
+      const container = document.getElementById('results-table-container');
       try {
-        const results = await api.get(`/results/${studentId}`);
+        const results = await api.get(`/results/${sid}`);
+        if (results.length === 0) {
+          container.innerHTML = '<div class="empty-state"><p>No results found for this student.</p></div>';
+          return;
+        }
 
-        // Show student info
-        infoDiv.style.display = 'block';
-        document.getElementById('student-name').textContent = 
-          `${results[0].FIRST_NAME} ${results[0].LAST_NAME}`;
-        document.getElementById('student-detail').textContent = 
-          `Student ID: ${results[0].STUDENT_ID}`;
+        document.getElementById('student-info').style.display = 'block';
+        document.getElementById('display-name').textContent = `Results for ${results[0].FIRST_NAME} ${results[0].LAST_NAME} (ID: ${results[0].STUDENT_ID})`;
 
-        // Show results table
         container.innerHTML = `
           <div class="table-wrapper animate-in">
             <table>
@@ -95,42 +110,46 @@
                 <tr>
                   <th>Exam</th>
                   <th>Session</th>
-                  <th>Phase / Shift</th>
-                  <th>Exam Date</th>
+                  <th>Date</th>
                   <th>Score</th>
-                  <th>Total</th>
-                  <th>Percentage</th>
                   <th>Percentile</th>
                 </tr>
               </thead>
               <tbody>
-                ${results.map(r => {
-                  const pct = ((r.SCORE / r.TOTAL_MARKS) * 100).toFixed(1);
-                  return `
-                    <tr>
-                      <td><strong>${r.EXAM_NAME}</strong></td>
-                      <td>${r.SESSION_ID}</td>
-                      <td>${r.PHASE} / ${r.SHIFT}</td>
-                      <td>${formatDate(r.EXAM_DATE)}</td>
-                      <td><strong style="color: var(--accent-blue-light);">${r.SCORE}</strong></td>
-                      <td>${r.TOTAL_MARKS}</td>
-                      <td>${pct}%</td>
-                      <td><span class="badge badge-green">${r.PERCENTILE}</span></td>
-                    </tr>
-                  `;
-                }).join('')}
+                ${results.map(r => `
+                  <tr>
+                    <td><strong>${r.EXAM_NAME}</strong></td>
+                    <td>${r.SESSION_ID}</td>
+                    <td>${formatDate(r.EXAM_DATE)}</td>
+                    <td><strong style="color: var(--accent-blue-light);">${r.SCORE} / ${r.TOTAL_MARKS}</strong></td>
+                    <td><span class="badge badge-green">${r.PERCENTILE}</span></td>
+                  </tr>
+                `).join('')}
               </tbody>
             </table>
           </div>`;
       } catch (err) {
-        infoDiv.style.display = 'none';
-        container.innerHTML = `
-          <div class="empty-state">
-            <div class="empty-icon">❌</div>
-            <p>${err.message}</p>
-          </div>`;
+        container.innerHTML = `<div class="empty-state"><p>${err.message}</p></div>`;
       }
     }
+
+    document.getElementById('result-update-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const payload = {
+        student_id: parseInt(document.getElementById('update-student-id').value),
+        session_id: parseInt(document.getElementById('update-session-id').value),
+        score: parseInt(document.getElementById('update-score').value),
+        percentile: parseFloat(document.getElementById('update-percentile').value)
+      };
+
+      try {
+        await api.post('/results', payload);
+        showAlert('alert-container', 'Result updated successfully', 'success');
+        searchResults(payload.student_id);
+      } catch (err) {
+        showAlert('alert-container', err.message, 'error');
+      }
+    });
   </script>
 </body>
 </html>

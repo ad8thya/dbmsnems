@@ -13,102 +13,23 @@
 
     <main class="container">
       <div class="page-header">
-        <h1>Student Management</h1>
-        <p>Register new students and manage existing records</p>
+        <h1 id="page-title">Student Management</h1>
+        <p id="page-desc">View and manage records for all students</p>
       </div>
 
       <div id="alert-container"></div>
 
-      <div class="content-grid">
-        <!-- Registration Form -->
-        <div>
-          <h2 class="section-title">📋 Register New Student</h2>
-          <div class="card form-section">
-            <form id="student-form">
-              <div class="form-row">
-                <div class="form-group">
-                  <label>First Name <span class="required">*</span></label>
-                  <input type="text" id="first_name" placeholder="Enter first name" required>
-                </div>
-                <div class="form-group">
-                  <label>Last Name <span class="required">*</span></label>
-                  <input type="text" id="last_name" placeholder="Enter last name" required>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Email <span class="required">*</span></label>
-                <input type="email" id="email" placeholder="student@email.com" required>
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label>Date of Birth <span class="required">*</span></label>
-                  <input type="date" id="dob" required>
-                </div>
-                <div class="form-group">
-                  <label>Category <span class="required">*</span></label>
-                  <select id="category" required>
-                    <option value="">Select category</option>
-                    <option value="General">General</option>
-                    <option value="OBC">OBC</option>
-                    <option value="SC">SC</option>
-                    <option value="ST">ST</option>
-                    <option value="EWS">EWS</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Street</label>
-                <input type="text" id="street" placeholder="Street address">
-              </div>
-
-              <div class="form-row">
-                <div class="form-group">
-                  <label>City</label>
-                  <input type="text" id="city" placeholder="City">
-                </div>
-                <div class="form-group">
-                  <label>State</label>
-                  <input type="text" id="state" placeholder="State">
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label>Exam Center <span class="required">*</span></label>
-                <select id="center_id" required>
-                  <option value="">Loading centers...</option>
-                </select>
-              </div>
-
-              <div class="form-group">
-                <label>Phone Numbers</label>
-                <div class="phone-group" id="phone-group">
-                  <div class="phone-entry">
-                    <input type="tel" class="phone-input" placeholder="10-digit phone number" maxlength="10">
-                    <button type="button" class="btn btn-secondary btn-sm" onclick="addPhoneField()">+</button>
-                  </div>
-                </div>
-              </div>
-
-              <button type="submit" class="btn btn-primary" id="submit-btn">
-                Register Student
-              </button>
-            </form>
-          </div>
+      <div id="admin-view" style="display: none;">
+        <h2 class="section-title">👥 All Registered Students</h2>
+        <p style="color: var(--text-muted); margin-bottom: 2rem;">Total access to student directory. Administrators can verify details or delete inactive accounts if necessary.</p>
+        <div id="students-table-container">
+          <div class="empty-state"><p>Loading students...</p></div>
         </div>
+      </div>
 
-        <!-- Students List -->
-        <div>
-          <h2 class="section-title">👥 Registered Students</h2>
-          <div id="students-table-container">
-            <div class="empty-state">
-              <div class="empty-icon">👤</div>
-              <p>Loading students...</p>
-            </div>
-          </div>
-        </div>
+      <div id="student-view" style="display: none;">
+        <h2 class="section-title">👤 Personal Profile</h2>
+        <div id="profile-container"></div>
       </div>
     </main>
 
@@ -121,47 +42,36 @@
   <script>
     document.getElementById('nav-container').innerHTML = getNavHTML('students.html');
 
-    // Load centers for dropdown
-    async function loadCenters() {
-      try {
-        const centers = await api.get('/students/centers/list');
-        populateSelect('center_id', centers, 'CENTER_ID', 
-          item => `${item.CENTER_NAME} (${item.CENTER_CITY})`,
-          'Select exam center'
-        );
-      } catch (err) {
-        console.error('Failed to load centers:', err);
-      }
+    const role = auth.getRole();
+    if (role === 'admin') {
+      document.getElementById('admin-view').style.display = 'block';
+      loadCenters();
+      loadStudents();
+    } else {
+      document.getElementById('page-title').textContent = 'My Profile';
+      document.getElementById('page-desc').textContent = 'View and verify your registration details';
+      document.getElementById('student-view').style.display = 'block';
+      loadProfile();
     }
 
-    // Load students list
+    async function loadCenters() {
+      const centers = await api.get('/students/centers/list');
+      populateSelect('center_id', centers, 'CENTER_ID', item => `${item.CENTER_NAME} (${item.CENTER_CITY})`);
+    }
+
     async function loadStudents() {
       try {
         const students = await api.get('/students');
         const container = document.getElementById('students-table-container');
-
         if (students.length === 0) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <div class="empty-icon">👤</div>
-              <p>No students registered yet</p>
-            </div>`;
+          container.innerHTML = '<div class="empty-state"><p>No students found</p></div>';
           return;
         }
-
         container.innerHTML = `
           <div class="table-wrapper">
             <table>
               <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Email</th>
-                  <th>Category</th>
-                  <th>Center</th>
-                  <th>Phones</th>
-                  <th>Actions</th>
-                </tr>
+                <tr><th>ID</th><th>Name</th><th>Email</th><th>Actions</th></tr>
               </thead>
               <tbody>
                 ${students.map(s => `
@@ -169,87 +79,65 @@
                     <td><strong>${s.STUDENT_ID}</strong></td>
                     <td>${s.FIRST_NAME} ${s.LAST_NAME}</td>
                     <td>${s.EMAIL}</td>
-                    <td><span class="badge badge-blue">${s.CATEGORY}</span></td>
-                    <td>${s.CENTER_NAME || '—'}</td>
-                    <td>${s.PHONE_NUMBERS.join(', ') || '—'}</td>
-                    <td>
-                      <button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.STUDENT_ID})">Delete</button>
-                    </td>
+                    <td><button class="btn btn-danger btn-sm" onclick="deleteStudent(${s.STUDENT_ID})">Delete</button></td>
                   </tr>
                 `).join('')}
               </tbody>
             </table>
           </div>`;
-      } catch (err) {
-        console.error('Failed to load students:', err);
-      }
+      } catch (err) { console.error(err); }
     }
 
-    // Add phone field
-    function addPhoneField() {
-      const group = document.getElementById('phone-group');
-      const entry = document.createElement('div');
-      entry.className = 'phone-entry';
-      entry.innerHTML = `
-        <input type="tel" class="phone-input" placeholder="10-digit phone number" maxlength="10">
-        <button type="button" class="btn btn-danger btn-sm" onclick="this.parentElement.remove()">✕</button>
-      `;
-      group.appendChild(entry);
-    }
-
-    // Submit form
-    document.getElementById('student-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = true;
-      btn.textContent = 'Registering...';
-
+    async function loadProfile() {
       try {
-        const phoneInputs = document.querySelectorAll('.phone-input');
-        const phone_numbers = Array.from(phoneInputs)
-          .map(input => input.value.trim())
-          .filter(p => p);
+        const students = await api.get('/students'); // Backend filters this to current student
+        const container = document.getElementById('profile-container');
+        
+        if (!students || students.length === 0) {
+          container.innerHTML = `
+            <div class="card animate-in" style="text-align: center; padding: 3rem;">
+              <div style="font-size: 3rem; margin-bottom: 1rem;">👤</div>
+              <p style="color: var(--text-muted);">Profile data not found. Please ensure you are logged in correctly.</p>
+              <button onclick="auth.logout()" class="btn btn-outline" style="margin-top: 1rem;">Logout and Re-login</button>
+            </div>`;
+          return;
+        }
 
-        const data = {
-          first_name: document.getElementById('first_name').value.trim(),
-          last_name: document.getElementById('last_name').value.trim(),
-          email: document.getElementById('email').value.trim(),
-          dob: document.getElementById('dob').value,
-          street: document.getElementById('street').value.trim(),
-          city: document.getElementById('city').value.trim(),
-          state: document.getElementById('state').value.trim(),
-          category: document.getElementById('category').value,
-          center_id: parseInt(document.getElementById('center_id').value),
-          phone_numbers
-        };
+        const s = students[0];
+        container.innerHTML = `
+          <div class="card animate-in">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-xl);">
+              <div>
+                <p style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Student ID</p>
+                <p style="font-size: 1.2rem; font-weight: 700; margin-bottom: var(--space-md);">${s.STUDENT_ID}</p>
+                
+                <p style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Full Name</p>
+                <p style="font-size: 1.1rem; margin-bottom: var(--space-md);">${s.FIRST_NAME} ${s.LAST_NAME}</p>
+                
+                <p style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Email</p>
+                <p style="margin-bottom: var(--space-md);">${s.EMAIL}</p>
+              </div>
+              <div>
+                <p style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Category</p>
+                <p style="margin-bottom: var(--space-md);"><span class="badge badge-blue">${s.CATEGORY}</span></p>
+                
+                <p style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Exam Center</p>
+                <p style="margin-bottom: var(--space-md);">${s.CENTER_NAME || 'Not Assigned'}</p>
+                
+                <p style="color: var(--text-muted); font-size: 0.8rem; text-transform: uppercase;">Phone Numbers</p>
+                <p>${(s.PHONE_NUMBERS && s.PHONE_NUMBERS.length > 0) ? s.PHONE_NUMBERS.join(', ') : 'No Phone Number'}</p>
+              </div>
+            </div>
+          </div>`;
+      } catch (err) { console.error(err); }
+    }
 
-        const result = await api.post('/students', data);
-        showAlert('alert-container', `${result.message} (ID: ${result.student_id})`, 'success');
-        document.getElementById('student-form').reset();
-        loadStudents();
-      } catch (err) {
-        showAlert('alert-container', err.message, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Register Student';
-      }
-    });
-
-    // Delete student
     async function deleteStudent(id) {
-      if (!confirm(`Are you sure you want to delete student ${id}?`)) return;
-      try {
+      if (confirm('Delete this account?')) {
         await api.delete(`/students/${id}`);
-        showAlert('alert-container', 'Student deleted successfully', 'success');
         loadStudents();
-      } catch (err) {
-        showAlert('alert-container', err.message, 'error');
       }
     }
-
-    // Initialize
-    loadCenters();
-    loadStudents();
   </script>
 </body>
 </html>

@@ -6,13 +6,43 @@
 const API_BASE = '/api';
 
 /**
- * Generic fetch wrapper with error handling
+ * Auth helpers
+ */
+const auth = {
+  getRole: () => localStorage.getItem('nems_role'),
+  getStudentId: () => localStorage.getItem('nems_student_id'),
+  getUserName: () => localStorage.getItem('nems_user_name'),
+  isLoggedIn: () => !!localStorage.getItem('nems_role'),
+  logout: () => {
+    localStorage.clear();
+    window.location.href = 'login.html';
+  },
+  checkAuth: () => {
+    if (!auth.isLoggedIn() && !window.location.pathname.endsWith('login.html') && !window.location.pathname.endsWith('signup.html')) {
+      window.location.href = 'login.html';
+    }
+  }
+};
+
+// Check auth on page load
+auth.checkAuth();
+
+/**
+ * Generic fetch wrapper with error handling and auth headers
  */
 async function apiRequest(endpoint, options = {}) {
   try {
     const url = `${API_BASE}${endpoint}`;
+    
+    // Add auth headers
+    const headers = { 
+      'Content-Type': 'application/json',
+      'x-user-role': auth.getRole() || '',
+      'x-student-id': auth.getStudentId() || ''
+    };
+
     const config = {
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       ...options
     };
 
@@ -21,7 +51,19 @@ async function apiRequest(endpoint, options = {}) {
     }
 
     const response = await fetch(url, config);
-    const data = await response.json();
+    
+    // Check if response is JSON
+    const contentType = response.headers.get('content-type');
+    let data;
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      const text = await response.text();
+      if (!response.ok) {
+        throw new Error(`Server Error (${response.status}): ${text.substring(0, 100)}`);
+      }
+      return text;
+    }
 
     if (!response.ok) {
       throw new Error(data.error || `Request failed with status ${response.status}`);
@@ -111,29 +153,48 @@ function statusBadge(status) {
  * Generate the standard nav bar HTML
  */
 function getNavHTML(activePage = '') {
-  const pages = [
-    { href: 'index.html', label: 'Dashboard' },
-    { href: 'students.html', label: 'Students' },
-    { href: 'register.html', label: 'Exam Registration' },
-    { href: 'results.html', label: 'Results' },
-    { href: 'grievance.html', label: 'Grievances' },
-    { href: 'allotment.html', label: 'Allotment' }
+  const role = auth.getRole();
+  
+  let pages = [
+    { href: 'index.html', label: 'Dashboard' }
   ];
+
+  if (role === 'admin') {
+    pages.push({ href: 'students.html', label: 'Student Management' });
+    pages.push({ href: 'register.html', label: 'Registrations' });
+    pages.push({ href: 'results.html', label: 'Results Update' });
+    pages.push({ href: 'grievance.html', label: 'Grievances' });
+    pages.push({ href: 'allotment.html', label: 'Allotments' });
+  } else if (role === 'student') {
+    pages.push({ href: 'students.html', label: 'My Profile' });
+    pages.push({ href: 'register.html', label: 'Register for Exam' });
+    pages.push({ href: 'results.html', label: 'My Results' });
+    pages.push({ href: 'grievance.html', label: 'Help Desk' });
+    pages.push({ href: 'allotment.html', label: 'My Allotment' });
+  }
 
   const links = pages.map(p =>
     `<a href="${p.href}" class="${p.href === activePage ? 'active' : ''}">${p.label}</a>`
   ).join('');
 
+  const userName = auth.getUserName() || (role === 'admin' ? 'Administrator' : 'Student');
+
   return `
     <header class="header">
-      <div class="container">
-        <a href="index.html" class="logo">
-          <div class="logo-icon">🎓</div>
-          NEMS
-        </a>
-        <nav class="nav">
-          ${links}
-        </nav>
+      <div class="container" style="display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 2rem;">
+          <a href="index.html" class="logo">
+            <div class="logo-icon">🎓</div>
+            NEMS
+          </a>
+          <nav class="nav">
+            ${links}
+          </nav>
+        </div>
+        <div class="user-profile" style="display: flex; align-items: center; gap: 1rem;">
+          <span style="color: var(--text-secondary); font-size: 0.9rem;">${userName} (${role})</span>
+          <button onclick="auth.logout()" class="btn btn-outline" style="padding: 0.4rem 0.8rem; font-size: 0.8rem;">Logout</button>
+        </div>
       </div>
     </header>
   `;

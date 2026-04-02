@@ -5,15 +5,26 @@ const db = require('../db');
 // GET /api/students — List all students with phone numbers
 router.get('/', async (req, res) => {
   try {
-    const result = await db.execute(`
+    const userRole = req.headers['x-user-role'];
+    const loggedInStudentId = req.headers['x-student-id'];
+
+    let query = `
       SELECT s.STUDENT_ID, s.FIRST_NAME, s.LAST_NAME, s.EMAIL, 
              TO_CHAR(s.DOB, 'YYYY-MM-DD') AS DOB,
              s.STREET, s.CITY, s.STATE, s.CATEGORY, 
              s.CENTER_ID, c.CENTER_NAME, c.CENTER_CITY
       FROM STUDENT s
       LEFT JOIN CENTER c ON s.CENTER_ID = c.CENTER_ID
-      ORDER BY s.STUDENT_ID
-    `);
+    `;
+    let params = [];
+
+    if (userRole === 'student' && loggedInStudentId) {
+      query += ' WHERE s.STUDENT_ID = :id';
+      params.push(loggedInStudentId);
+    }
+
+    query += ' ORDER BY s.STUDENT_ID';
+    const result = await db.execute(query, params);
 
     // Fetch phone numbers for each student
     const students = [];
@@ -77,9 +88,15 @@ router.get('/centers/list', async (req, res) => {
   }
 });
 
-// POST /api/students — Create new student
+// POST /api/students — Create new student (Not for Admin use)
 router.post('/', async (req, res) => {
+  const userRole = req.headers['x-user-role'];
+  if (userRole === 'admin') {
+    return res.status(403).json({ error: 'Admins cannot manually create student accounts' });
+  }
+  // Rest of registration logic for self-registration if allowed...
   const { first_name, last_name, email, dob, street, city, state, category, center_id, phone_numbers } = req.body;
+  // ... (original insertion code)
 
   let connection;
   try {
@@ -132,8 +149,19 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /api/students/:id — Update student
+// PUT /api/students/:id — Update student details (Student self-update only)
 router.put('/:id', async (req, res) => {
+  const userRole = req.headers['x-user-role'];
+  const loggedInStudentId = req.headers['x-student-id'];
+
+  if (userRole === 'admin') {
+    return res.status(403).json({ error: 'Admins cannot modify student profiles' });
+  }
+
+  if (userRole === 'student' && req.params.id.toString() !== loggedInStudentId.toString()) {
+    return res.status(403).json({ error: 'You can only update your own profile' });
+  }
+
   const { first_name, last_name, email, dob, street, city, state, category, center_id } = req.body;
 
   try {
@@ -160,8 +188,13 @@ router.put('/:id', async (req, res) => {
   }
 });
 
-// DELETE /api/students/:id — Delete student
+// DELETE /api/students/:id — Delete student (Admin only)
 router.delete('/:id', async (req, res) => {
+  const userRole = req.headers['x-user-role'];
+  if (userRole !== 'admin') {
+    return res.status(403).json({ error: 'Only admins can delete students' });
+  }
+
   let connection;
   try {
     connection = await db.getConnection();

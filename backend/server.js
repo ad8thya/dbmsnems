@@ -20,6 +20,7 @@ const registrationRoutes = require('./routes/registrations');
 const resultRoutes = require('./routes/results');
 const grievanceRoutes = require('./routes/grievances');
 const allotmentRoutes = require('./routes/allotments');
+const authRoutes = require('./routes/auth');
 
 // Mount routes
 app.use('/api/students', studentRoutes);
@@ -28,6 +29,7 @@ app.use('/api', registrationRoutes);
 app.use('/api', resultRoutes);
 app.use('/api', grievanceRoutes);
 app.use('/api', allotmentRoutes);
+app.use('/api/auth', authRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

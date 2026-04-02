@@ -13,57 +13,52 @@
 
     <main class="container">
       <div class="page-header">
-        <h1>Grievance Portal</h1>
-        <p>Submit and track your grievances</p>
+        <h1 id="page-title">Grievance Portal</h1>
+        <p id="page-desc">Submit and track examination-related issues</p>
       </div>
 
       <div id="alert-container"></div>
 
       <div class="content-grid">
-        <!-- Submission Form -->
-        <div>
+        <!-- Submission Form (Visible to Students and Admin) -->
+        <div id="submit-section">
           <h2 class="section-title">📨 Submit Grievance</h2>
           <div class="card form-section">
             <form id="grievance-form">
-              <div class="form-group">
+              <div class="form-group" id="student-id-group">
                 <label>Student ID <span class="required">*</span></label>
-                <input type="number" id="student_id" placeholder="Enter your Student ID" required>
+                <input type="number" id="student_id" required>
               </div>
-
               <div class="form-group">
                 <label>Issue Type <span class="required">*</span></label>
                 <select id="issue_type" required>
-                  <option value="">Select issue type</option>
                   <option value="Score Discrepancy">Score Discrepancy</option>
                   <option value="Technical Issue">Technical Issue</option>
                   <option value="Center Issue">Center Issue</option>
                   <option value="Registration Issue">Registration Issue</option>
-                  <option value="Result Error">Result Error</option>
                   <option value="Other">Other</option>
                 </select>
               </div>
-
               <div class="form-group">
                 <label>Description <span class="required">*</span></label>
-                <textarea id="description" placeholder="Describe your issue in detail..." rows="4" required></textarea>
+                <textarea id="description" rows="4" required></textarea>
               </div>
-
-              <button type="submit" class="btn btn-primary" id="submit-btn">
-                Submit Grievance
-              </button>
+              <button type="submit" class="btn btn-primary" id="submit-btn" style="width: 100%;">Submit Ticket</button>
             </form>
           </div>
         </div>
 
-        <!-- Lookup Grievances -->
+        <!-- Tracking Section -->
         <div>
-          <h2 class="section-title">🔍 Track Grievances</h2>
+          <h2 class="section-title" id="track-title">🔍 Track Grievances</h2>
           <div class="card">
-            <div class="search-bar">
-              <input type="number" id="lookup-id" placeholder="Student ID">
+            <div class="search-bar" id="admin-search-bar" style="display: none;">
+              <input type="number" id="lookup-id" placeholder="Enter Student ID">
               <button class="btn btn-secondary" onclick="lookupGrievances()">Search</button>
             </div>
-            <div id="grievance-result"></div>
+            <div id="grievance-result">
+              <div class="empty-state"><p>No records found</p></div>
+            </div>
           </div>
         </div>
       </div>
@@ -78,90 +73,78 @@
   <script>
     document.getElementById('nav-container').innerHTML = getNavHTML('grievance.html');
 
-    // Submit grievance
-    document.getElementById('grievance-form').addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const btn = document.getElementById('submit-btn');
-      btn.disabled = true;
-      btn.textContent = 'Submitting...';
+    const role = auth.getRole();
+    const studentId = auth.getStudentId();
 
-      try {
-        const data = {
-          student_id: parseInt(document.getElementById('student_id').value),
-          issue_type: document.getElementById('issue_type').value,
-          description: document.getElementById('description').value.trim()
-        };
-
-        const result = await api.post('/grievance', data);
-        showAlert('alert-container', 
-          `${result.message} — Ticket #${result.ticket_no}`, 'success');
-        document.getElementById('grievance-form').reset();
-      } catch (err) {
-        showAlert('alert-container', err.message, 'error');
-      } finally {
-        btn.disabled = false;
-        btn.textContent = 'Submit Grievance';
-      }
-    });
-
-    // Lookup grievances
-    async function lookupGrievances() {
-      const studentId = document.getElementById('lookup-id').value;
-      if (!studentId) {
-        showAlert('alert-container', 'Please enter a Student ID', 'error');
-        return;
-      }
-
-      const container = document.getElementById('grievance-result');
-
-      try {
-        const grievances = await api.get(`/grievances/${studentId}`);
-
-        if (grievances.length === 0) {
-          container.innerHTML = `
-            <div class="empty-state">
-              <p>No grievances found for student ${studentId}</p>
-            </div>`;
-          return;
-        }
-
-        container.innerHTML = `
-          <div style="margin-top: 1rem;">
-            <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-              <strong>${grievances[0].FIRST_NAME} ${grievances[0].LAST_NAME}</strong> — ${grievances.length} grievance(s)
-            </p>
-            <div class="table-wrapper">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Ticket #</th>
-                    <th>Issue Type</th>
-                    <th>Description</th>
-                    <th>Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  ${grievances.map(g => `
-                    <tr>
-                      <td><strong>${g.TICKET_NO}</strong></td>
-                      <td>${g.ISSUE_TYPE}</td>
-                      <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${g.DESCRIPTION}">${g.DESCRIPTION}</td>
-                      <td>${statusBadge(g.STATUS)}</td>
-                    </tr>
-                  `).join('')}
-                </tbody>
-              </table>
-            </div>
-          </div>`;
-      } catch (err) {
-        showAlert('alert-container', err.message, 'error');
-      }
+    if (role === 'admin') {
+      document.getElementById('admin-search-bar').style.display = 'flex';
+      document.getElementById('track-title').textContent = '📋 All Grievances';
+    } else {
+      document.getElementById('student-id-group').style.display = 'none';
+      document.getElementById('student_id').required = false;
+      document.getElementById('track-title').textContent = '📋 My Grievances';
+      lookupGrievances(studentId);
     }
 
-    // Allow Enter key in lookup
-    document.getElementById('lookup-id').addEventListener('keypress', (e) => {
-      if (e.key === 'Enter') lookupGrievances();
+    document.getElementById('grievance-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const sid = role === 'admin' ? document.getElementById('student_id').value : studentId;
+      const data = {
+        student_id: parseInt(sid),
+        issue_type: document.getElementById('issue_type').value,
+        description: document.getElementById('description').value
+      };
+      try {
+        const res = await api.post('/grievance', data);
+        showAlert('alert-container', `Ticket #${res.ticket_no} submitted successfully!`, 'success');
+        lookupGrievances(sid);
+      } catch (err) { showAlert('alert-container', err.message, 'error'); }
     });
+
+    async function lookupGrievances(id) {
+      const sid = id || document.getElementById('lookup-id').value;
+      if (!sid && role === 'admin') return;
+      
+      const container = document.getElementById('grievance-result');
+      try {
+        const grievances = await api.get(`/grievances/${sid}`);
+        if (grievances.length === 0) {
+          container.innerHTML = '<div class="empty-state"><p>No grievances found.</p></div>';
+          return;
+        }
+        container.innerHTML = `
+          <div class="table-wrapper animate-in" style="margin-top: 1rem;">
+            <table>
+              <thead><tr><th>ID</th><th>Type</th><th>Status</th>${role === 'admin' ? '<th>Action</th>' : ''}</tr></thead>
+              <tbody>
+                ${grievances.map(g => `
+                  <tr>
+                    <td><strong>#${g.TICKET_NO}</strong></td>
+                    <td>${g.ISSUE_TYPE}</td>
+                    <td>${statusBadge(g.STATUS)}</td>
+                    ${role === 'admin' ? `
+                      <td>
+                        <select onchange="updateStatus(${g.TICKET_NO}, this.value)" style="padding: 2px 4px; font-size: 0.8rem;">
+                          <option value="Pending" ${g.STATUS === 'Pending' ? 'selected' : ''}>Pending</option>
+                          <option value="Resolved" ${g.STATUS === 'Resolved' ? 'selected' : ''}>Resolved</option>
+                          <option value="Rejected" ${g.STATUS === 'Rejected' ? 'selected' : ''}>Rejected</option>
+                        </select>
+                      </td>
+                    ` : ''}
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>`;
+      } catch (err) { console.error(err); }
+    }
+
+    async function updateStatus(ticketNo, status) {
+      try {
+        await api.put(`/grievance/${ticketNo}`, { status });
+        showAlert('alert-container', `Ticket #${ticketNo} updated to ${status}`, 'success');
+      } catch (err) { showAlert('alert-container', err.message, 'error'); }
+    }
   </script>
 </body>
 </html>

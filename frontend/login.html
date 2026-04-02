@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | NEMS</title>
+    <link rel="stylesheet" href="css/style.css">
+    <style>
+        .auth-container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: calc(100vh - 100px);
+            padding: var(--space-xl);
+        }
+        .auth-card {
+            width: 100%;
+            max-width: 450px;
+            padding: var(--space-2xl);
+            animation: fadeIn 0.5s ease;
+        }
+        .auth-header {
+            text-align: center;
+            margin-bottom: var(--space-2xl);
+        }
+        .auth-header h1 {
+            margin-bottom: var(--space-sm);
+        }
+        .role-selector {
+            display: flex;
+            gap: var(--space-sm);
+            margin-bottom: var(--space-xl);
+            background: var(--bg-input);
+            padding: 4px;
+            border-radius: var(--radius-md);
+        }
+        .role-btn {
+            flex: 1;
+            padding: 0.6rem;
+            border-radius: var(--radius-sm);
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all var(--transition-fast);
+        }
+        .role-btn.active {
+            background: var(--bg-card-hover);
+            color: var(--text-primary);
+            box-shadow: var(--shadow-sm);
+        }
+        .auth-footer {
+            margin-top: var(--space-xl);
+            text-align: center;
+            font-size: 0.9rem;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body class="page-wrapper">
+    <header class="header">
+        <div class="container">
+            <a href="login.html" class="logo">
+                <div class="logo-icon">🎓</div>
+                NEMS
+            </a>
+        </div>
+    </header>
+
+    <main class="auth-container">
+        <div class="card auth-card">
+            <div class="auth-header">
+                <h1>Welcome Back</h1>
+                <p>National Examination Management System</p>
+            </div>
+
+            <div class="role-selector">
+                <button type="button" class="role-btn active" id="studentRole">Student</button>
+                <button type="button" class="role-btn" id="adminRole">Admin</button>
+            </div>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label id="userLabel">Student ID</label>
+                    <input type="text" id="username" placeholder="Enter your ID" required>
+                </div>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="••••••••" required>
+                </div>
+                <div id="alertContainer"></div>
+                <button type="submit" class="btn btn-primary" style="width: 100%;">Sign In</button>
+            </form>
+
+            <div class="auth-footer" id="signupLink">
+                Don't have an account? <a href="signup.html">Sign Up</a>
+            </div>
+        </div>
+    </main>
+
+    <script src="js/api.js"></script>
+    <script>
+        let currentRole = 'student';
+        const studentBtn = document.getElementById('studentRole');
+        const adminBtn = document.getElementById('adminRole');
+        const userLabel = document.getElementById('userLabel');
+        const usernameInput = document.getElementById('username');
+        const signupLink = document.getElementById('signupLink');
+
+        studentBtn.addEventListener('click', () => {
+            currentRole = 'student';
+            studentBtn.classList.add('active');
+            adminBtn.classList.remove('active');
+            userLabel.textContent = 'Student ID';
+            usernameInput.placeholder = 'Enter your ID';
+            signupLink.style.display = 'block';
+        });
+
+        adminBtn.addEventListener('click', () => {
+            currentRole = 'admin';
+            adminBtn.classList.add('active');
+            studentBtn.classList.remove('active');
+            userLabel.textContent = 'Admin Username';
+            usernameInput.placeholder = 'Enter username';
+            signupLink.style.display = 'none';
+        });
+
+        document.getElementById('loginForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const username = usernameInput.value;
+            const password = document.getElementById('password').value;
+            const alertContainer = 'alertContainer';
+
+            try {
+                const response = await api.post('/auth/login', {
+                    username,
+                    password,
+                    role: currentRole
+                });
+
+                if (response.success) {
+                    localStorage.setItem('nems_role', response.role);
+                    localStorage.setItem('nems_student_id', response.studentId || '');
+                    localStorage.setItem('nems_user_name', response.firstName || 'Administrator');
+                    
+                    showAlert(alertContainer, response.message, 'success');
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 1000);
+                }
+            } catch (err) {
+                showAlert(alertContainer, err.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
